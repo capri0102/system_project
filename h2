@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#define PERM 0644 // 파일 접근 허가 설정 값
+#define PERM_ALL 0777 // 디렉토리 접근 허가 설정 값
+#define SIZE 512 // buffer 사이즈 설정 값
+
+main(int argc, char * argv[]){
+
+        int infile, outfile, f_count=0, s_count=0, i;
+        int o_op_flag=0, x_op_flag=0, n_op_flag=0; // 해당 옵션 구별에 사용
+        char *maked_f_name, *temp_f_name;
+	char *buffer, *dir;
+        ssize_t nread,out_t;
+
+        for(i=1; i<argc; i++){ // 명령어 다음 인자 부터 for문에 사용
+		if(!strcmp(argv[i], "-o")){ 
+			o_op_flag = 1; // -o 옵션 설정 값을 1로 설정
+                        s_count = i+1; // 합쳐야 될 첫 번째 파일의 인수 위치 저장
+                        while(argv[i+1][j]!='1' && argv[i+1][j]!='\0'){
+				j++; // -o 옵션 다음 인자에 있는 파일명에서 숫자가 나오지 않을 
+			} // 때 까지 실행하면서 문자 수 파악
+			temp_f_name = (char *)malloc(j+1);
+                        // 파일의 문자 수 만큼만 default 생성파일 이름으로 설정
+			strncpy(temp_f_name, argv[i+1], j); 
+			f_count = i; 
+                        while(strncmp(argv[f_count+1],"-", 1)){ //다음 인자의 첫 문자와 "-" 를 비교해서 참이면 실행(합쳐야될 파일들을 계속 받기 위함)
+                        	f_count++; // 합쳐야 될 마지막 파일의 인수 위치 저장
+                                if((f_count+1)>= argc) // 검색해야할 인자 값이 커맨드의 갯수보다 많거나 같아지면 while문 빠져나감
+                                 	break;
+                        }
+                }
+                if(!strcmp(argv[i], "-n")){
+                        n_op_flag = 1; // -n 옵션 설정 값을 1로 설정
+                        maked_f_name = argv[i+1]; // 생성될 파일의 이름 저장
+                }
+                if(!strcmp(argv[i], "-d")){
+                        dir = argv[i+1]; 
+                        if(chdir(dir) == -1) // -d 옵션 이후에 입력 받은 디렉토리명이 없거나, 경로상의 모든 디렉토리에 대해 수행허가를 가지지 못하면
+                                mkdir(dir, PERM_ALL); // 입력 받은 디렉토리명으로 디렉토리 생성
+                }
+                if(!strcmp(argv[i], "-x")){
+                        x_op_flag = 1; // -x 옵션 설정 값을 1로 설정
+                }
+        }
+
+        chdir(dir); // 수행 디렉토리 변경
+
+        if(o_op_flag == 0){ // -o 옵션은 필수 옵션이기 때문에 프로세스 실행 불가
+                fputs("You must input -o option, to do this process!!\n", stderr);
+                exit(1);
+        }
+        if(n_op_flag == 0){ // -n 옵션이 없다면 합쳐질 파일의 이름(Default Name)을 생성될 파일의 이름으로 설정
+                strcpy(maked_f_name, temp_f_name);
+        }
+	if(x_op_flag == 0)
+                printf("Delete Option = No\n");
+        if(x_op_flag == 1)
+                printf("Delete Option = Yes\n");
+	buffer = (char *)malloc(sizeof(char)*SIZE); // 동적할당
+	for(i = s_count; i <= f_count; i++){ // 합쳐야 할 파일의 첫 인자 위치 값 부터 마지막 인자 위치 값 까지 실행
+                if((infile = open(argv[i], O_RDONLY)) == -1){
+                        fputs("InFile open Error!! \n", stderr); // 합쳐야 할 파일 열기 실패
+                        return (-1);
+                }
+		printf("Object file name = %s\n", argv[i]);
+		if((outfile = open(maked_f_name, O_WRONLY | O_CREAT | O_APPEND, PERM)) == -1){ 
+                        fputs("OutFile open Error!! \n", stderr); // 생성될 파일 열기 실패
+                        close(infile); // 생성될 파일을 열기 실패 하면 이미 열었던 합쳐야될 파일을 닫아준다.
+                        return (-2);
+                }
+		if(x_op_flag == 1) // -x (삭제)옵션이 설정되어 있다면 
+                        unlink(argv[i]); // 합쳐야될 파일들을 하나씩 삭제 한다.
+		while((nread = read(infile, buffer, SIZE)) > 0){ 
+			if((out_t= write(outfile, buffer, nread)) < nread){
+                                close (infile);
+                                close (outfile);
+                                free(buffer); // 동적할당 한 buffer free
+                                return (-3);
+                        }
+                }
+                close (infile);
+                close (outfile);
+                if(nread == -1)
+                        return (-4); // 마지막 읽기에서 오류 발생
+        }
+        free(buffer); // 동적할당 한 buffer free
+	free(maked_f_name);
+	free(temp_f_name);
+	fputs("complete!!\n", stdout);
+        return 0;
+}
