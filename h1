@@ -1,0 +1,82 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define PERM 0644 // 파일 접근 허가 설정 값
+#define PERM_ALL 0777 // 폴더 접근 허가 설정 값
+
+int main(int argc, char *argv[]){
+
+        int infile, outfile, i, count =1; // count : 생성파일 번호 생성 시 사용 
+	int choice; // -s 옵션에서 재입력 여부 결정시 사용 
+        int o_op_flag=0, n_op_flag=0; // -o,n 옵션 사용 여부 표시
+	int obj_f_name, maked_f_name; // 분할,생성될 파일명의 인자 위치 저장시 사용
+        char *dir, *buffer, temp[100]; // temp : 생성 파일 문자열 저장 
+        int maked_f_size = 512; // 생성될 파일의 Default size
+        ssize_t nread;
+	off_t obj_f_size;
+
+        for(i=1; i<argc; i++){ // 명령어 다음 인자 부터 실행
+		if(!strcmp(argv[i], "-o")){ // argv[] 인자 값이 -o 옵션 이면
+			obj_f_name = i+1; // 대상 파일명 인자 위치 저장 
+			o_op_flag = 1; 
+		}
+            	if(!strcmp(argv[i], "-n")){ // argv[] 인자 값이 -n 옵션 이면
+			maked_f_name = i+1; // 생성될 파일명 인자 위치 저장
+			n_op_flag = 1;
+		}
+            	if(!strcmp(argv[i], "-s")){ // argv[] 인자 값이 -s 옵션 이면
+			maked_f_size = atoi(argv[i+1]); // 생성될 파일 사이즈 초기화
+		}
+		if(!strcmp(argv[i], "-d")){ // argv[] 인자 값이 -d 옵션 이면
+			dir = argv[i+1]; // 다음 인자를 디렉토리명으로 쓰기 위해 저장
+			if(chdir(dir) == -1){ // 입력 받은 디렉토리명이 없거나, 
+       					//경로상의 모든 디렉토리에 대해 수행허가를 가지지 못하면
+       				mkdir(dir, PERM_ALL); // 입력받은 디렉토리명으로 디렉토리 생성
+			}
+		}
+        }
+	if(o_op_flag == 0){ // -o 옵션은 필수 옵션이므로 없다면 프로그램 종료
+		fputs("You must put -o option!! \n", stdout);
+            	exit(1);
+        }
+        if(n_op_flag == 0) // -n 옵션으로 입력해준 생성될 파일 명이 없다면 분할될 파일명을                     maked_f_name = obj_f_name; // Default Name으로 사용
+        if((infile = open(argv[obj_f_name], O_RDONLY)) == -1){
+           	 fputs("InFile open Error!! \n", stdout); // 파일 열기 실패 
+           	 exit(1);
+	}
+        obj_f_size = lseek(infile, (off_t)0, SEEK_END); // 분할 될 파일의 크기 구함
+        if((obj_f_size/maked_f_size) > 1000){ // 생성될 파일의 갯수가 1000개가 넘는 경우           		fputs("Too many files creted. Retry big file size.\n", stdout); 
+		exit(1);
+        }else{
+            	lseek(infile, (off_t)0, SEEK_SET); // 분할 될 파일 포인터를 처음으로 돌려줌
+        }
+        //분할될, 생성될 파일의 정보 출력
+	printf("object file name = %s \n", argv[obj_f_name] );
+        printf("object file size = %fKb \n", (float)obj_f_size/1024);
+        printf("maked file name = %s ... \n", argv[maked_f_name]);
+        printf("maked file size = %fKb \n", (float)maked_f_size/1024);
+		
+        buffer = (char *)malloc(sizeof(char)*maked_f_size); // 생성될 파일 크기로 
+                                                            //buffer size 동적할당
+	while((nread = read(infile, buffer, maked_f_size)) > 0){
+            	sprintf(temp, "%s%d", argv[maked_f_name], count); // 생성 될 파일명 temp에 저장
+		count++; // 생성 될 파일의 숫자 값 증가
+            	chdir(dir); // 입력받은 디렉토리명으로 실행 디렉토리 변경
+		//생성할 파일 열기, 쓰기전용 | 파일이 없으면 생성 | 있다면 크기를 0으로
+            	if((outfile = open(temp, O_WRONLY|O_CREAT|O_TRUNC, PERM)) == -1){
+			fputs("OutFile open Error!! \n", stderr); 
+                	exit(1);
+            	}
+            		write(outfile, buffer, nread);
+           	 	close(outfile);
+        }
+        close(infile);
+        free(buffer);
+	fputs("Complete!!\n",stdout);
+	
+        return 0;
+}
