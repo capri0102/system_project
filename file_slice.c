@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <ftw.h>
 #include <errno.h>
 
 #define PERMS 0777
@@ -21,7 +20,6 @@
       excution directory
 ***************************************************/
 void print_help();
-int list(const char *name, const struct stat *status, int type);
 int dir_make(char* m_dir);
 int file_slice(char* m_in, char* m_out, char* m_dir, int m_size);
 
@@ -74,9 +72,6 @@ void print_help(){
 	fprintf(stdout, " -s\tSlice file size\n");
 	fprintf(stdout, " -d\tstory directory\n");
 	exit(1);
-}
-int list(const char *name, const struct stat *status, int type){
-	return 0;
 }
 int dir_make(char* m_dir){
 	int retval;
